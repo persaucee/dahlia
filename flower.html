@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #050505; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+<script>
+    const PETAL_COUNT = 500;    
+    const GROW_SPEED = 2;       
+    const SPREAD = 13;
+    
+    // Wind Configuration
+    const WIND_STRENGTH = 2;    // How much it sways (Degrees)
+    const WIND_SPEED = 0.5;     // How fast it sways
+    
+    let petals = [];
+    let frame = 0;
+
+    function setup() {
+        createCanvas(windowWidth, windowHeight);
+        colorMode(HSB, 360, 100, 100, 1);
+        angleMode(DEGREES);
+        
+        for (let i = 0; i < PETAL_COUNT; i++) {
+            let angle = i * 137.508; 
+            let r = SPREAD * sqrt(i); 
+            let x = r * cos(angle);
+            let y = r * sin(angle);
+            
+            // --- COLOR LOGIC (Matched to your Black Dahlia) ---
+            let hue, sat, bright;
+            if (i < 20) { hue = 60; sat = 20; bright = 100; } 
+            else if (i < 60) { hue = 70; sat = 90; bright = 90; } 
+            else { hue = 340; sat = 15; bright = 15; }
+            
+            petals.push({
+                idx: i,
+                // Store base positions (we will modify them with wind later)
+                baseX: x,
+                baseY: y,
+                angle: angle,
+                baseScale: map(i, 0, PETAL_COUNT, 0.5, 3.8), 
+                currentScale: 0,
+                baseHue: hue,
+                baseSat: sat,
+                baseBright: bright,
+                isCenter: i < 60,
+                // Each petal gets a unique "noise offset" so they don't move in perfect unison
+                noiseOffset: random(1000) 
+            });
+        }
+    }
+
+    function draw() {
+        background(5); 
+        translate(width / 2, height / 2);
+
+        // --- GLOBAL WIND SWAY (The "Nod") ---
+        // Rotates the entire coordinate system slowly
+        // using frameCount to drive a Sine wave
+        let windRotation = sin(frameCount * WIND_SPEED) * WIND_STRENGTH;
+        rotate(windRotation);
+        
+        for (let i = 0; i < petals.length; i++) {
+            let p = petals[i];
+            
+            // --- GROWTH ANIMATION ---
+            let startFrame = p.idx * 0.3;
+            if (frame > startFrame) {
+                if (p.currentScale < p.baseScale) {
+                    p.currentScale += (p.baseScale - p.currentScale) * 0.04;
+                }
+
+                // --- MICRO-WIND (The "Ripple") ---
+                // Only apply this after the petal has mostly grown
+                let windX = 0;
+                let windY = 0;
+                
+                if (p.currentScale > p.baseScale * 0.8) {
+                    // Use Perlin noise for organic, non-repetitive shivering
+                    // We map the noise to a tiny range (-2 to 2 pixels)
+                    let n = noise(p.noiseOffset + frameCount * 0.01);
+                    let windForce = map(n, 0, 1, -2, 2);
+                    
+                    // Outer petals are affected more by wind than the stiff center
+                    let flexibility = map(p.idx, 0, PETAL_COUNT, 0, 1);
+                    windX = windForce * flexibility;
+                    windY = windForce * flexibility;
+                }
+
+                drawPetal(p, windX, windY);
+            }
+        }
+        frame += GROW_SPEED;
+    }
+
+    function drawPetal(p, windX, windY) {
+        push();
+        // Add the wind offset to the base position
+        translate(p.baseX + windX, p.baseY + windY);
+        rotate(p.angle + 90); 
+        scale(p.currentScale);
+
+        let ctx = drawingContext;
+        let gradient = ctx.createLinearGradient(0, -25, 0, 15);
+        
+        let c1, c2;
+        if (p.isCenter) {
+            c1 = color(p.baseHue, p.baseSat, p.baseBright);
+            c2 = color(p.baseHue, p.baseSat + 10, p.baseBright - 20);
+        } else {
+            c1 = color(p.baseHue, p.baseSat, p.baseBright + 10); 
+            c2 = color(p.baseHue, p.baseSat + 10, p.baseBright - 10);
+        }
+        
+        gradient.addColorStop(0, c1.toString());
+        gradient.addColorStop(1, c2.toString());
+        ctx.fillStyle = gradient;
+        
+        if (!p.isCenter) {
+            stroke(255, 0.1); 
+            strokeWeight(0.5);
+        } else {
+            noStroke();
+        }
+
+        beginShape();
+        vertex(0, -20); 
+        bezierVertex(18, -10, 18, 10, 0, 20);  
+        bezierVertex(-18, 10, -18, -10, 0, -20); 
+        endShape(CLOSE);
+        
+        pop();
+    }
+
+    function windowResized() {
+        resizeCanvas(windowWidth, windowHeight);
+    }
+</script>
+</body>
+</html>
